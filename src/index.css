@@ -1,0 +1,391 @@
+/* ========================================
+   Liquid Block Estimator — Design System
+   Brand colors derived from liquid-block.com
+   ======================================== */
+
+:root {
+  /* Brand Colors */
+  --brand-red: #D0021B;
+  --brand-red-dark: #A80016;
+  --brand-red-light: rgba(208, 2, 27, 0.08);
+  --brand-gold: #FFCC00;
+  --brand-blue: #00AEEF;
+
+  /* Semantic Colors */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-info: #00AEEF;
+
+  /* Backgrounds */
+  --bg-main: #FFFFFF;
+  --bg-section: #F4F4F4;
+  --bg-panel: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #FAFAFA;
+  --bg-card-selected: rgba(208, 2, 27, 0.04);
+  --bg-input: #FFFFFF;
+
+  /* Text Colors */
+  --text-primary: #1A1A1A;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --text-on-brand: #FFFFFF;
+
+  /* Borders */
+  --border-color: #E0E0E0;
+  --border-light: #EEEEEE;
+  --border-focus: #D0021B;
+  --border-subtle: #E8E8E8;
+
+  /* Legacy variable aliases (for gradual migration of inline styles) */
+  --neon-cyan: #D0021B;
+  --neon-pink: #EF4444;
+  --neon-purple: #7C3AED;
+  --neon-green: #10B981;
+  --neon-cyan-glow: rgba(208, 2, 27, 0.08);
+  --text-main: #1A1A1A;
+  --bg-main-legacy: #FFFFFF;
+  --surface: #FFFFFF;
+  --bg-input-legacy: #FFFFFF;
+}
+
+body {
+  margin: 0;
+  font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.7;
+}
+
+/* ======== Panels ======== */
+.glass-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-light);
+  border-radius: 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* ======== Selection Cards ======== */
+.selection-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid transparent;
+  border-radius: 2px;
+  padding: 20px 24px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.selection-card::before {
+  display: none;
+}
+
+.selection-card:hover {
+  background: var(--bg-card-hover);
+  border-left-color: var(--brand-red);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: scale(1.03);
+  transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Reveal background image more on hover */
+.selection-card:hover .card-bg-img {
+  opacity: 0.35 !important;
+}
+
+/* Card icon zoom-up on hover: 115% with smooth ease */
+.selection-card:hover .card-icon {
+  transform: scale(1.15);
+  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.card-icon {
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* fadeIn keyframe for cross-column preview overlay */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Preview image items stagger animation */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.selection-card.selected {
+  background: var(--bg-card-selected);
+  border-color: var(--border-color);
+  border-left-color: var(--brand-red);
+  box-shadow: 0 2px 8px rgba(208, 2, 27, 0.1);
+}
+
+/* ======== Typography ======== */
+.text-gradient {
+  color: var(--brand-red);
+  background: none;
+  -webkit-text-fill-color: var(--brand-red);
+}
+
+.text-gradient-cyan {
+  color: var(--text-primary);
+  background: none;
+  -webkit-text-fill-color: var(--text-primary);
+}
+
+/* ======== Buttons ======== */
+.btn-primary {
+  background: var(--brand-red);
+  color: var(--text-on-brand);
+  border: none;
+  padding: 12px 32px;
+  border-radius: 0;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: none;
+  letter-spacing: 0.5px;
+}
+
+.btn-primary:hover {
+  background: var(--brand-red-dark);
+  transform: none;
+  box-shadow: 0 2px 8px rgba(208, 2, 27, 0.2);
+  filter: none;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--bg-main);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 12px 32px;
+  border-radius: 0;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-section);
+  border-color: var(--text-primary);
+}
+
+/* ======== Form Inputs ======== */
+.input-field {
+  width: 100%;
+  background: var(--bg-input);
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 10px 16px 10px 16px;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.input-field:focus {
+  outline: none;
+  border-bottom-color: var(--brand-red);
+  box-shadow: none;
+}
+
+.input-field::placeholder {
+  color: var(--text-muted);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+/* ======== Layout ======== */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+/* ======== Date Input ======== */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: none;
+}
+
+/* ======== Scrollbar (subtle) ======== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ======== Print Styles ======== */
+@page {
+  size: A4;
+  margin: 12mm 10mm 12mm 10mm;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 10px !important;
+    line-height: 1.4 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  main {
+    padding: 0 !important;
+    display: block !important;
+    align-items: unset !important;
+    justify-content: unset !important;
+  }
+
+  .glass-panel {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    font-size: 9px !important;
+    page-break-inside: auto !important;
+  }
+
+  table th {
+    background: #f0f0f0 !important;
+    color: #333 !important;
+    border-bottom: 2px solid #ccc !important;
+    padding: 5px 8px !important;
+    font-size: 8px !important;
+    font-weight: 600 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  table td {
+    color: #18181b !important;
+    border-bottom: 1px solid #e0e0e0 !important;
+    padding: 4px 8px !important;
+    font-size: 9px !important;
+  }
+
+  table tr {
+    background: #ffffff !important;
+    page-break-inside: avoid !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  .text-gradient-cyan, h1, h2, h3, div, span, p, label {
+    color: #000000 !important;
+    text-shadow: none !important;
+    -webkit-text-fill-color: #000000 !important;
+  }
+
+  h1 { font-size: 18px !important; }
+  h2 { font-size: 13px !important; margin: 8px 0 4px 0 !important; }
+  h3 { font-size: 11px !important; }
+
+  header,
+  .btn-primary,
+  .btn-secondary,
+  button,
+  .lead-capture-form,
+  .status-tabs,
+  .action-buttons {
+    display: none !important;
+  }
+
+  .print-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  .print-avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 8px !important;
+  }
+
+  input[type="date"],
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="checkbox"],
+  textarea,
+  select {
+    border: none !important;
+    background: none !important;
+    padding: 0 !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
