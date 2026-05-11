@@ -526,8 +526,9 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
   }
 
   if (isCgOnly) {
-    // CG単価: 全工程 ¥50,000/日 で統一
-    const CG_RATE = 50000;
+    // CG単価: 2D=¥50,000/日、3D=¥60,000/日
+    const CG_RATE_2D = 50000;
+    const CG_RATE_3D = 60000;
     // 納期: 通常=1.5ヶ月（約30営業日）、特急=10日〜1.5ヶ月（人数増で対応）、余裕=2ヶ月以上
     let deadlineDaysMul = 1; let deadlinePersonsMul = 1;
     let isExpress = false;
@@ -537,29 +538,29 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
     if (answers['cg_type'] === '2d_motion') {
       // 2D系 — 通常30営業日ベース
       const persons2d = Math.max(1, Math.round(1 * deadlinePersonsMul));
-      addLine('CG', '2Dアニメーション (After Effects)', CG_RATE, persons2d, Math.max(2, Math.round(10 * deadlineDaysMul)), '人日');
-      addLine('CG', '2Dアセットデザイン (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('CG', '2Dグラフィック素材 (Illustrator・Photoshop)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('CG', 'コンポジット (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('CG', '2Dエフェクト (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '2Dアニメーション (After Effects)', CG_RATE_2D, persons2d, Math.max(2, Math.round(10 * deadlineDaysMul)), '人日');
+      addLine('CG', '2Dアセットデザイン (After Effects)', CG_RATE_2D, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '2Dグラフィック素材 (Illustrator・Photoshop)', CG_RATE_2D, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', 'コンポジット (After Effects)', CG_RATE_2D, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '2Dエフェクト (After Effects)', CG_RATE_2D, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
     } else if (answers['cg_type'] === '3d_product') {
       // 3D プロダクト系
       const persons3d = Math.max(1, Math.round(2 * deadlinePersonsMul));
-      addLine('CG', '3Dモデリング (Cinema4D・Blender)', CG_RATE, persons3d, Math.max(3, Math.round(10 * deadlineDaysMul)), '人日');
-      addLine('CG', '3D背景モデリング (Cinema4D・Blender)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('CG', '3Dアニメーション (Cinema4D・Blender)', CG_RATE, persons3d, Math.max(2, Math.round(8 * deadlineDaysMul)), '人日');
-      addLine('CG', 'コンポジット (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('CG', '3Dエフェクト (Cinema4D・Blender)', CG_RATE, 1, Math.max(1, Math.round(3 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dモデリング (Cinema4D・Blender)', CG_RATE_3D, persons3d, Math.max(3, Math.round(10 * deadlineDaysMul)), '人日');
+      addLine('CG', '3D背景モデリング (Cinema4D・Blender)', CG_RATE_3D, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dアニメーション (Cinema4D・Blender)', CG_RATE_3D, persons3d, Math.max(2, Math.round(8 * deadlineDaysMul)), '人日');
+      addLine('CG', 'コンポジット (After Effects)', CG_RATE_2D, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dエフェクト (Cinema4D・Blender)', CG_RATE_3D, 1, Math.max(1, Math.round(3 * deadlineDaysMul)), '人日');
     } else if (answers['cg_type'] === 'full_3d_vfx') {
       // ハイエンド 3D / VFX
       const personsVfx = Math.max(1, Math.round(3 * deadlinePersonsMul));
-      addLine('CG', '3Dキャラクターモデリング (Cinema4D・Blender)', CG_RATE, Math.max(1, Math.round(2 * deadlinePersonsMul)), Math.max(3, Math.round(12 * deadlineDaysMul)), '人日');
-      addLine('CG', '3D背景モデリング (Cinema4D・Blender)', CG_RATE, Math.max(1, Math.round(1 * deadlinePersonsMul)), Math.max(2, Math.round(8 * deadlineDaysMul)), '人日');
-      addLine('CG', '3Dリギング (Cinema4D・Blender)', CG_RATE, 1, Math.max(2, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('CG', '3Dアニメーション (Cinema4D・Blender)', CG_RATE, personsVfx, Math.max(5, Math.round(15 * deadlineDaysMul)), '人日');
-      addLine('CG', '3Dエフェクト (Cinema4D・Blender)', CG_RATE, Math.max(1, Math.round(1 * deadlinePersonsMul)), Math.max(2, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('CG', '2Dエフェクト (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('CG', 'コンポジット (After Effects)', CG_RATE, Math.max(1, Math.round(2 * deadlinePersonsMul)), Math.max(3, Math.round(8 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dキャラクターモデリング (Cinema4D・Blender)', CG_RATE_3D, Math.max(1, Math.round(2 * deadlinePersonsMul)), Math.max(3, Math.round(12 * deadlineDaysMul)), '人日');
+      addLine('CG', '3D背景モデリング (Cinema4D・Blender)', CG_RATE_3D, Math.max(1, Math.round(1 * deadlinePersonsMul)), Math.max(2, Math.round(8 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dリギング (Cinema4D・Blender)', CG_RATE_3D, 1, Math.max(2, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dアニメーション (Cinema4D・Blender)', CG_RATE_3D, personsVfx, Math.max(5, Math.round(15 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dエフェクト (Cinema4D・Blender)', CG_RATE_3D, Math.max(1, Math.round(1 * deadlinePersonsMul)), Math.max(2, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '2Dエフェクト (After Effects)', CG_RATE_2D, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', 'コンポジット (After Effects)', CG_RATE_2D, Math.max(1, Math.round(2 * deadlinePersonsMul)), Math.max(3, Math.round(8 * deadlineDaysMul)), '人日');
     } else if (answers['cg_type'] === 'partial') {
       // 部分発注: cgPartialItemsに含まれる工程のみ
       const partialMap: Record<string, { name: string; baseDays: number; rate?: number; unit?: string; phase?: string }> = {
@@ -585,7 +586,7 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
       cgPartialItems.forEach(key => {
         const item = partialMap[key];
         if (item) {
-          const rate = item.rate || CG_RATE;
+          const rate = item.rate || (key.startsWith('3d') ? CG_RATE_3D : CG_RATE_2D);
           const unit = item.unit || '人日';
           const phase = (item.phase || 'CG') as PhaseType;
           addLine(phase, item.name, rate, unit === '人日' ? 1 : undefined, Math.max(1, Math.round(item.baseDays * deadlineDaysMul)), unit);
@@ -737,12 +738,19 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
     grossTotal += contingency;
   }
 
-  let partnerDiscount = 0;
-  if (answers['client_type'] === 'agency') partnerDiscount = Math.round(grossTotal * 0.15);
-  else if (answers['client_type'] === 'production' || answers['client_type'] === 'cg_production') partnerDiscount = Math.round(grossTotal * 0.20);
+  // 割引は各カテゴリに按分吸収（見積書に割引行を表示しない）
+  let partnerDiscountRate = 0;
+  if (answers['client_type'] === 'agency') partnerDiscountRate = 0.15;
+  else if (answers['client_type'] === 'production' || answers['client_type'] === 'cg_production') partnerDiscountRate = 0.20;
   
-  if (partnerDiscount > 0) {
-    allItems.push({ phase: 'Discount', name: `パートナー割引 (-${answers['client_type'] === 'agency' ? '15' : '20'}%)`, unit: '式', unitPrice: -partnerDiscount, amount: -partnerDiscount });
+  if (partnerDiscountRate > 0) {
+    allItems.forEach(item => {
+      if (item.amount > 0) {
+        const discount = Math.round(item.amount * partnerDiscountRate);
+        item.unitPrice = Math.round(item.unitPrice * (1 - partnerDiscountRate));
+        item.amount = item.amount - discount;
+      }
+    });
   }
 
   const total = allItems.reduce((acc, item) => acc + item.amount, 0);
@@ -1322,31 +1330,41 @@ function App() {
     data.push([]); r++;
 
     // === フェーズ別明細 ===
-    const phases = ['Planning', 'Pre-Production', 'Shooting', 'Cast', 'CG', 'Post-Production', 'Audio', 'Overhead', 'Discount', 'Express'] as const;
-    const phaseLabels: Record<string, string> = { 'Planning': '企画構成費', 'Pre-Production': '制作準備費', 'Shooting': '撮影費', 'Cast': '出演者関係費', 'CG': 'CG/アニメーション費', 'Post-Production': 'ポストプロダクション', 'Audio': '音楽・音響費', 'Overhead': '制作管理費', 'Discount': '割引', 'Express': '特急料金' };
+    const phases = ['Planning', 'Pre-Production', 'Shooting', 'Cast', 'CG', 'Post-Production', 'Audio', 'Overhead', 'Express'] as const;
+    const phaseLabels: Record<string, string> = { 'Planning': '企画構成費', 'Pre-Production': '制作準備費', 'Shooting': '撮影費', 'Cast': '出演者関係費', 'CG': 'CG/アニメーション費', 'Post-Production': 'ポストプロダクション', 'Audio': '音楽・音響費', 'Overhead': '制作管理費', 'Express': '特急料金' };
+
+    // 表示モード: 一般企業・代理店はsummary（カテゴリ合計のみ）
+    const isExcelSummary = !isAdmin && (answers['client_type'] === 'end_client' || answers['client_type'] === 'agency');
 
     for (const phase of phases) {
       const phaseItems = items.filter(i => i.phase === phase);
       if (phaseItems.length === 0) continue;
 
-      data.push([`■ ${phaseLabels[phase] || phase}`]); merges.push({ s: { r, c: 0 }, e: { r, c: 6 } }); r++;
-      data.push(['', '内訳', '単価', '人数', '日数', '単位', '金額']); r++;
+      const phaseTotal = phaseItems.reduce((sum, i) => sum + (i.isEstimateOnly ? 0 : i.amount), 0);
 
-      let phaseTotal = 0;
-      let phaseDays = 0;
-      for (const item of phaseItems) {
-        data.push([
-          '',
-          item.name + (item.isCustom ? ' ★' : ''),
-          item.isEstimateOnly ? '別途見積' : item.unitPrice,
-          item.persons || '',
-          item.days || '',
-          item.unit,
-          item.isEstimateOnly ? '別途見積' : item.amount
-        ]); r++;
-        if (!item.isEstimateOnly) { phaseTotal += item.amount; phaseDays += (item.days || 0); }
+      if (isExcelSummary) {
+        // 集約モード: カテゴリ名と合計のみ
+        data.push([`■ ${phaseLabels[phase] || phase}`, '', '', '', '', '', phaseTotal]); merges.push({ s: { r, c: 0 }, e: { r, c: 5 } }); r++;
+      } else {
+        // 詳細モード: 従来どおり
+        data.push([`■ ${phaseLabels[phase] || phase}`]); merges.push({ s: { r, c: 0 }, e: { r, c: 6 } }); r++;
+        data.push(['', '内訳', '単価', '人数', '日数', '単位', '金額']); r++;
+
+        let phaseDays = 0;
+        for (const item of phaseItems) {
+          data.push([
+            '',
+            item.name + (item.isCustom ? ' ★' : ''),
+            item.isEstimateOnly ? '別途見積' : item.unitPrice,
+            item.persons || '',
+            item.days || '',
+            item.unit,
+            item.isEstimateOnly ? '別途見積' : item.amount
+          ]); r++;
+          if (!item.isEstimateOnly) { phaseDays += (item.days || 0); }
+        }
+        data.push(['', '', '', '', phaseDays || '', '小計', phaseTotal]); r++;
       }
-      data.push(['', '', '', '', phaseDays || '', '小計', phaseTotal]); r++;
       data.push([]); r++;
     }
 
@@ -1594,6 +1612,21 @@ function App() {
     const phaseItems = est.items.filter(i => i.phase === phase);
     if (phaseItems.length === 0) return null;
     const phaseTotal = phaseItems.reduce((acc, i) => acc + i.amount, 0);
+
+    // 表示モード判定: 一般企業・代理店はsummary、制作会社はdetailed、Adminは常にdetailed
+    const isSummaryMode = !isAdmin && (answers['client_type'] === 'end_client' || answers['client_type'] === 'agency');
+
+    if (isSummaryMode) {
+      // 集約モード: カテゴリ名と合計金額のみ
+      return (
+        <div className="print-section" style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', background: 'var(--bg-section)', border: '1px solid var(--border-subtle)', borderRadius: '2px' }}>
+            <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>{title}</span>
+            <span style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: '16px', color: 'var(--text-primary)' }}>¥{phaseTotal.toLocaleString()} <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>(税込 ¥{Math.round(phaseTotal * 1.1).toLocaleString()})</span></span>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="print-section" style={{ marginBottom: '32px' }}>
@@ -2563,7 +2596,6 @@ function App() {
 
                   {renderPhaseTable('Overhead', '8. 制作管理費・予備費', '--text-main',
                     'データ管理、機材保守、通信費等の諸経費です。仕様変更の可能性がある場合は予備費（バッファ）も含まれます。')}
-                  {renderPhaseTable('Discount', 'パートナー割引', '--neon-green')}
                   {renderPhaseTable('Express', '特急対応オプション', '--neon-pink',
                     '納期が1ヶ月半以内（10日以上）の場合、人員増強等のための特急料金が適用されます。')}
                 </div>
