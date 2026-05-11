@@ -403,7 +403,13 @@ const questions: Question[] = [
   { id: 'cast', title: '出演者（キャスト）の手配は必要ですか？', condition: (ans) => ans['shooting'] === '1day' || ans['shooting'] === 'multi', options: [
       { id: 'none', label: '不要（自社社員等）', icon: Users, desc: 'キャストの手配・費用なし' },
       { id: 'extra', label: 'モデル手配（1年契約）', icon: UserPlus, desc: 'プロモデル・エキストラ（1年間の使用権含む）' },
-      { id: 'talent', label: '有名タレント・インフルエンサー', icon: Star, desc: '※費用は要別途お見積もりとなります' },
+      { id: 'talent', label: '有名タレント・インフルエンサー', icon: Star, desc: '次の画面で規模感を選択→概算費用を自動反映します' },
+  ]},
+  { id: 'talent_rank', title: 'タレント・インフルエンサーの規模感は？', condition: (ans) => ans['cast'] === 'talent', options: [
+      { id: 'micro', label: 'マイクロインフルエンサー', icon: Users, desc: 'フォロワー1万人未満。参考価格帯：10万～30万円' },
+      { id: 'mid', label: '中小規模インフルエンサー', icon: UserPlus, desc: 'フォロワー1万～10万人。参考価格帯：30万～80万円' },
+      { id: 'major', label: '人気タレント・大手インフルエンサー', icon: Star, desc: 'TV出演等の知名度。参考価格帯：100万～500万円' },
+      { id: 'top', label: 'トップタレント（Aクラス）', icon: Crown, desc: '国民的知名度。参考価格帯：500万円～' },
   ]},
   { id: 'lighting', title: '照明スタッフの手配は必要ですか？', condition: (ans) => (ans['shooting'] === '1day' || ans['shooting'] === 'multi') && ans['location'] !== 'studio', options: [
       { id: 'lighting_yes', label: '照明スタッフあり', icon: Sparkles, desc: 'プロの照明技師を手配し、映像品質を向上' },
@@ -502,7 +508,17 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
       addLine('Production', 'ヘアメイク・スタイリスト手配費', 50000, 1, sDays, '人日');
     }
     else if (answers['cast'] === 'talent') {
-      addLine('Production', '有名タレント・インフルエンサー出演費', 0, undefined, undefined, '別途見積もり', true);
+      // タレントランクに応じた概算金額を反映
+      const talentPricing: Record<string, { price: number; label: string }> = {
+        'micro': { price: 200000, label: 'マイクロインフルエンサー出演費（概算）' },
+        'mid': { price: 500000, label: '中小規模インフルエンサー出演費（概算）' },
+        'major': { price: 3000000, label: '人気タレント・インフルエンサー出演費（概算）' },
+        'top': { price: 10000000, label: 'トップタレント（Aクラス）出演費（概算）' },
+      };
+      const rank = answers['talent_rank'] || 'mid';
+      const talent = talentPricing[rank] || talentPricing['mid'];
+      addLine('Production', talent.label, talent.price, undefined, 1, '式');
+      addLine('Pre-Production', 'キャスティング手配・プロダクション費', 100000, undefined, 1, '式');
       addLine('Production', 'ヘアメイク・スタイリスト手配費', 70000, 2, sDays, '人日');
     }
   }
