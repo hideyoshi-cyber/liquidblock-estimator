@@ -97,7 +97,7 @@ type Question = { id: string; title: string; options: Option[]; condition?: (ans
 type CustomerInfo = { projectName: string; companyName: string; contactName: string; email: string; phone: string; address: string; };
 type DocumentType = 'estimate' | 'order' | 'delivery' | 'invoice';
 type ProjectStatus = 'draft' | 'estimate' | 'ordered' | 'production' | 'delivered' | 'invoiced' | 'paid';
-type PhaseType = 'Pre-Production' | 'Production' | 'Post-Production' | 'Overhead' | 'Discount' | 'Express';
+type PhaseType = 'Planning' | 'Pre-Production' | 'Shooting' | 'Cast' | 'CG' | 'Post-Production' | 'Audio' | 'Express' | 'Overhead' | 'Discount';
 
 export type LineItem = {
   id?: string; // For custom items
@@ -466,15 +466,15 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
       let dirDays = 2;
       if (answers['certainty'] === 'draft') dirDays += 2;
       if (answers['certainty'] === 'uncertain') dirDays += 3;
-      addLine('Pre-Production', 'ディレクション・進行管理費', 60000, 1, dirDays, '人日');
+      addLine('Planning', 'ディレクション・進行管理費', 60000, 1, dirDays, '人日');
     } else {
       let dirDays = 2;
       if (answers['certainty'] === 'draft') dirDays += 3;
       if (answers['certainty'] === 'uncertain') dirDays += 5;
       if ((answers['client_type'] === 'production' || answers['client_type'] === 'cg_production') && answers['certainty'] !== 'uncertain') dirDays = Math.max(1, dirDays - 3);
-      addLine('Pre-Production', 'ディレクション・進行管理費', 60000, 1, dirDays, '人日');
+      addLine('Planning', 'ディレクション・進行管理費', 60000, 1, dirDays, '人日');
       if (answers['client_type'] !== 'production' && answers['client_type'] !== 'cg_production') {
-        addLine('Pre-Production', '絵コンテ・Vコンテ作成費', 40000, 1, answers['certainty'] === 'uncertain' ? 5 : 2, '人日');
+        addLine('Planning', '絵コンテ・Vコンテ作成費', 40000, 1, answers['certainty'] === 'uncertain' ? 5 : 2, '人日');
       }
       if (answers['shooting'] === '1day' || answers['shooting'] === 'multi') addLine('Pre-Production', 'ロケハン・撮影準備費', 50000, 2, 1, '人日');
     }
@@ -482,30 +482,30 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
 
   if (!isCgOnly && answers['shooting'] !== 'none' && answers['shooting']) {
     const sDays = answers['shooting'] === 'multi' ? 3 : 1;
-    addLine('Production', 'ディレクター（現場指揮）', 60000, 1, sDays, '人日');
-    addLine('Production', 'カメラマン', 80000, 1, sDays, '人日');
-    if (answers['shooting'] === 'multi') { addLine('Production', 'カメラアシスタント', 35000, 2, sDays, '人日'); }
-    addLine('Production', 'カメラ機材レンタル費（カメラ・レンズ）', 80000, undefined, sDays, '日');
-    addLine('Production', '音声収録機材費', 20000, undefined, sDays, '日');
+    addLine('Shooting', 'ディレクター（現場指揮）', 60000, 1, sDays, '人日');
+    addLine('Shooting', 'カメラマン', 80000, 1, sDays, '人日');
+    if (answers['shooting'] === 'multi') { addLine('Shooting', 'カメラアシスタント', 35000, 2, sDays, '人日'); }
+    addLine('Shooting', 'カメラ機材レンタル費（カメラ・レンズ）', 80000, undefined, sDays, '日');
+    addLine('Shooting', '音声収録機材費', 20000, undefined, sDays, '日');
     // 照明機材: 照明スタッフがいる場合のみ
     const hasLighting = answers['location'] === 'studio' || answers['shooting'] === 'multi' || answers['lighting'] === 'lighting_yes';
-    if (hasLighting) addLine('Production', '照明機材レンタル費', 40000, undefined, sDays, '日');
+    if (hasLighting) addLine('Shooting', '照明機材レンタル費', 40000, undefined, sDays, '日');
     // 照明スタッフ: スタジオは必須、ロケは選択制、multiは必須
     if (answers['location'] === 'studio') {
-      addLine('Production', '照明技師', 70000, 1, sDays, '人日');
-      addLine('Production', '照明アシスタント', 35000, 1, sDays, '人日');
+      addLine('Shooting', '照明技師', 70000, 1, sDays, '人日');
+      addLine('Shooting', '照明アシスタント', 35000, 1, sDays, '人日');
     } else if (answers['shooting'] === 'multi') {
-      addLine('Production', '照明技師', 70000, 1, sDays, '人日');
+      addLine('Shooting', '照明技師', 70000, 1, sDays, '人日');
     } else if (answers['lighting'] === 'lighting_yes') {
-      addLine('Production', '照明技師', 70000, 1, sDays, '人日');
+      addLine('Shooting', '照明技師', 70000, 1, sDays, '人日');
     }
-    if (answers['location'] === 'studio') addLine('Production', 'ハウススタジオ代', 150000, undefined, sDays, '日');
-    else if (answers['location'] === 'outdoor') addLine('Production', '特殊ロケ費（車両・ドローン等）', 100000, undefined, sDays, '日');
+    if (answers['location'] === 'studio') addLine('Shooting', 'ハウススタジオ代', 150000, undefined, sDays, '日');
+    else if (answers['location'] === 'outdoor') addLine('Shooting', '特殊ロケ費（車両・ドローン等）', 100000, undefined, sDays, '日');
     if (answers['cast'] === 'extra') {
-      addLine('Production', 'モデル出演費', 50000, 2, sDays, '人日');
-      addLine('Production', 'モデル使用権（1年契約）', 150000, 2, undefined, '名');
-      addLine('Pre-Production', 'キャスティング手配・オーディション費', 50000, undefined, 1, '式');
-      addLine('Production', 'ヘアメイク・スタイリスト手配費', 50000, 1, sDays, '人日');
+      addLine('Cast', 'モデル出演費', 50000, 2, sDays, '人日');
+      addLine('Cast', 'モデル使用権（1年契約）', 150000, 2, undefined, '名');
+      addLine('Cast', 'キャスティング手配・オーディション費', 50000, undefined, 1, '式');
+      addLine('Cast', 'ヘアメイク・スタイリスト手配費', 50000, 1, sDays, '人日');
     }
     else if (answers['cast'] === 'talent') {
       // タレントランクに応じた概算金額を反映
@@ -517,9 +517,9 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
       };
       const rank = answers['talent_rank'] || 'mid';
       const talent = talentPricing[rank] || talentPricing['mid'];
-      addLine('Production', talent.label, talent.price, undefined, 1, '式');
-      addLine('Pre-Production', 'キャスティング手配・プロダクション費', 100000, undefined, 1, '式');
-      addLine('Production', 'ヘアメイク・スタイリスト手配費', 70000, 2, sDays, '人日');
+      addLine('Cast', talent.label, talent.price, undefined, 1, '式');
+      addLine('Cast', 'キャスティング手配・プロダクション費', 100000, undefined, 1, '式');
+      addLine('Cast', 'ヘアメイク・スタイリスト手配費', 70000, 2, sDays, '人日');
     }
   }
 
@@ -535,29 +535,29 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
     if (answers['cg_type'] === '2d_motion') {
       // 2D系 — 通常30営業日ベース
       const persons2d = Math.max(1, Math.round(1 * deadlinePersonsMul));
-      addLine('Post-Production', '2Dアニメーション (After Effects)', CG_RATE, persons2d, Math.max(2, Math.round(10 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', '2Dアセットデザイン (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', '2Dグラフィック素材 (Illustrator・Photoshop)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', 'コンポジット (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', '2Dエフェクト (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '2Dアニメーション (After Effects)', CG_RATE, persons2d, Math.max(2, Math.round(10 * deadlineDaysMul)), '人日');
+      addLine('CG', '2Dアセットデザイン (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '2Dグラフィック素材 (Illustrator・Photoshop)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', 'コンポジット (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '2Dエフェクト (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
     } else if (answers['cg_type'] === '3d_product') {
       // 3D プロダクト系
       const persons3d = Math.max(1, Math.round(2 * deadlinePersonsMul));
-      addLine('Post-Production', '3Dモデリング (Cinema4D・Blender)', CG_RATE, persons3d, Math.max(3, Math.round(10 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', '3D背景モデリング (Cinema4D・Blender)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', '3Dアニメーション (Cinema4D・Blender)', CG_RATE, persons3d, Math.max(2, Math.round(8 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', 'コンポジット (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', '3Dエフェクト (Cinema4D・Blender)', CG_RATE, 1, Math.max(1, Math.round(3 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dモデリング (Cinema4D・Blender)', CG_RATE, persons3d, Math.max(3, Math.round(10 * deadlineDaysMul)), '人日');
+      addLine('CG', '3D背景モデリング (Cinema4D・Blender)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dアニメーション (Cinema4D・Blender)', CG_RATE, persons3d, Math.max(2, Math.round(8 * deadlineDaysMul)), '人日');
+      addLine('CG', 'コンポジット (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dエフェクト (Cinema4D・Blender)', CG_RATE, 1, Math.max(1, Math.round(3 * deadlineDaysMul)), '人日');
     } else if (answers['cg_type'] === 'full_3d_vfx') {
       // ハイエンド 3D / VFX
       const personsVfx = Math.max(1, Math.round(3 * deadlinePersonsMul));
-      addLine('Post-Production', '3Dキャラクターモデリング (Cinema4D・Blender)', CG_RATE, Math.max(1, Math.round(2 * deadlinePersonsMul)), Math.max(3, Math.round(12 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', '3D背景モデリング (Cinema4D・Blender)', CG_RATE, Math.max(1, Math.round(1 * deadlinePersonsMul)), Math.max(2, Math.round(8 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', '3Dリギング (Cinema4D・Blender)', CG_RATE, 1, Math.max(2, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', '3Dアニメーション (Cinema4D・Blender)', CG_RATE, personsVfx, Math.max(5, Math.round(15 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', '3Dエフェクト (Cinema4D・Blender)', CG_RATE, Math.max(1, Math.round(1 * deadlinePersonsMul)), Math.max(2, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', '2Dエフェクト (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
-      addLine('Post-Production', 'コンポジット (After Effects)', CG_RATE, Math.max(1, Math.round(2 * deadlinePersonsMul)), Math.max(3, Math.round(8 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dキャラクターモデリング (Cinema4D・Blender)', CG_RATE, Math.max(1, Math.round(2 * deadlinePersonsMul)), Math.max(3, Math.round(12 * deadlineDaysMul)), '人日');
+      addLine('CG', '3D背景モデリング (Cinema4D・Blender)', CG_RATE, Math.max(1, Math.round(1 * deadlinePersonsMul)), Math.max(2, Math.round(8 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dリギング (Cinema4D・Blender)', CG_RATE, 1, Math.max(2, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dアニメーション (Cinema4D・Blender)', CG_RATE, personsVfx, Math.max(5, Math.round(15 * deadlineDaysMul)), '人日');
+      addLine('CG', '3Dエフェクト (Cinema4D・Blender)', CG_RATE, Math.max(1, Math.round(1 * deadlinePersonsMul)), Math.max(2, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', '2Dエフェクト (After Effects)', CG_RATE, 1, Math.max(1, Math.round(5 * deadlineDaysMul)), '人日');
+      addLine('CG', 'コンポジット (After Effects)', CG_RATE, Math.max(1, Math.round(2 * deadlinePersonsMul)), Math.max(3, Math.round(8 * deadlineDaysMul)), '人日');
     } else if (answers['cg_type'] === 'partial') {
       // 部分発注: cgPartialItemsに含まれる工程のみ
       const partialMap: Record<string, { name: string; baseDays: number }> = {
@@ -576,13 +576,13 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
       cgPartialItems.forEach(key => {
         const item = partialMap[key];
         if (item) {
-          addLine('Post-Production', item.name, CG_RATE, 1, Math.max(1, Math.round(item.baseDays * deadlineDaysMul)), '人日');
+          addLine('CG', item.name, CG_RATE, 1, Math.max(1, Math.round(item.baseDays * deadlineDaysMul)), '人日');
         }
       });
     }
     // レンダリングサーバー（部分発注で工程がない場合はスキップ）
     if (answers['cg_type'] !== 'partial' || cgPartialItems.length > 0) {
-      addLine('Post-Production', 'レンダリングサーバー使用費', 30000, undefined, Math.max(3, Math.round(10 * deadlineDaysMul)), '日');
+      addLine('CG', 'レンダリングサーバー使用費', 30000, undefined, Math.max(3, Math.round(10 * deadlineDaysMul)), '日');
     }
 
     // 特急料金（10日〜1.5ヶ月以内の場合 +30%）
@@ -649,32 +649,32 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
     }
   }
 
-  if (answers['media'] === 'led' || answers['media'] === 'mapping') addLine('Post-Production', '特殊フォーマット変換・マッピング調整費', 100000, undefined, 1, '式');
+  if (answers['media'] === 'led' || answers['media'] === 'mapping') addLine('CG', '特殊フォーマット変換・マッピング調整費', 100000, undefined, 1, '式');
   if (answers['media'] === 'mapping') {
     addLine('Pre-Production', '現地ロケハン・投影テスト（最低3回）', 50000, 2, 3, '人日');
     addLine('Pre-Production', '現地調査 交通費・宿泊費', 30000, 2, 3, '人回');
   }
   if (answers['narration'] === 'pro' && answers['category'] !== 'music_video') {
-    addLine('Post-Production', 'プロナレーター収録費（1年契約・使用権含む）', 200000, undefined, 1, '式');
-    addLine('Post-Production', '収録スタジオ費', 50000, undefined, 1, '式');
-    addLine('Post-Production', 'MA・整音作業費', 40000, 1, 1, '式');
+    addLine('Audio', 'プロナレーター収録費（1年契約・使用権含む）', 200000, undefined, 1, '式');
+    addLine('Audio', '収録スタジオ費', 50000, undefined, 1, '式');
+    addLine('Audio', 'MA・整音作業費', 40000, 1, 1, '式');
   }
-  else if (answers['narration'] === 'ai_narration' && answers['category'] !== 'music_video') { addLine('Post-Production', 'AIナレーション制作費（修正1回込）', 30000, undefined, 1, '式'); addLine('Post-Production', 'AIナレーション追加修正（以降1回ごと）', 10000, undefined, 1, '回'); }
-  else if (answers['narration'] !== 'none' && answers['category'] !== 'music_video') addLine('Post-Production', 'BGM・SE選曲・整音作業費', 30000, undefined, 1, '式');
-  if (answers['bgm'] === 'original') addLine('Post-Production', 'オリジナルBGM制作（作曲・編曲）', 150000, undefined, 1, '式');
+  else if (answers['narration'] === 'ai_narration' && answers['category'] !== 'music_video') { addLine('Audio', 'AIナレーション制作費（修正1回込）', 30000, undefined, 1, '式'); addLine('Audio', 'AIナレーション追加修正（以降1回ごと）', 10000, undefined, 1, '回'); }
+  else if (answers['narration'] !== 'none' && answers['category'] !== 'music_video') addLine('Audio', 'BGM・SE選曲・整音作業費', 30000, undefined, 1, '式');
+  if (answers['bgm'] === 'original') addLine('Audio', 'オリジナルBGM制作（作曲・編曲）', 150000, undefined, 1, '式');
   if (answers['language'] === 'multi_lang') addLine('Post-Production', '英語字幕翻訳・テロップ作成費', 50000, undefined, 1, '式');
 
   // --- AI素材制作 ---
   if (answers['ai_assets'] === 'ai_light') {
-    addLine('Production', 'AI静止画生成', 10000, undefined, 3, '枚');
-    addLine('Production', 'AI背景生成', 10000, undefined, 2, '枚');
-    addLine('Production', 'AI使用課金（API・クラウド利用費）', 10000, undefined, 1, '式');
+    addLine('CG', 'AI静止画生成', 10000, undefined, 3, '枚');
+    addLine('CG', 'AI背景生成', 10000, undefined, 2, '枚');
+    addLine('CG', 'AI使用課金（API・クラウド利用費）', 10000, undefined, 1, '式');
   } else if (answers['ai_assets'] === 'ai_heavy') {
-    addLine('Production', 'AIモデル生成（人物）', 50000, undefined, 2, '名');
-    addLine('Production', 'AI動画生成', 30000, undefined, 5, 'カット');
-    addLine('Production', 'AI静止画生成', 10000, undefined, 10, '枚');
-    addLine('Production', 'AI背景生成', 10000, undefined, 5, '枚');
-    addLine('Production', 'AI使用課金（API・クラウド利用費）', 10000, undefined, 3, '式');
+    addLine('CG', 'AIモデル生成（人物）', 50000, undefined, 2, '名');
+    addLine('CG', 'AI動画生成', 30000, undefined, 5, 'カット');
+    addLine('CG', 'AI静止画生成', 10000, undefined, 10, '枚');
+    addLine('CG', 'AI背景生成', 10000, undefined, 5, '枚');
+    addLine('CG', 'AI使用課金（API・クラウド利用費）', 10000, undefined, 3, '式');
   }
 
   // --- シーケンスデータ引き渡し ---
@@ -1293,8 +1293,8 @@ function App() {
     data.push([]); r++;
 
     // === フェーズ別明細 ===
-    const phases = ['Pre-Production', 'Production', 'Post-Production', 'Overhead', 'Discount', 'Express'] as const;
-    const phaseLabels: Record<string, string> = { 'Pre-Production': 'プリプロダクション', 'Production': 'プロダクション', 'Post-Production': 'ポストプロダクション', 'Overhead': '諸経費・管理費', 'Discount': '割引', 'Express': '特急料金' };
+    const phases = ['Planning', 'Pre-Production', 'Shooting', 'Cast', 'CG', 'Post-Production', 'Audio', 'Overhead', 'Discount', 'Express'] as const;
+    const phaseLabels: Record<string, string> = { 'Planning': '企画構成費', 'Pre-Production': '制作準備費', 'Shooting': '撮影費', 'Cast': '出演者関係費', 'CG': 'CG/アニメーション費', 'Post-Production': 'ポストプロダクション', 'Audio': '音楽・音響費', 'Overhead': '制作管理費', 'Discount': '割引', 'Express': '特急料金' };
 
     for (const phase of phases) {
       const phaseItems = items.filter(i => i.phase === phase);
@@ -2461,12 +2461,20 @@ function App() {
                 </div>
 
                 <div style={{ marginBottom: '40px' }}>
-                  {renderPhaseTable('Pre-Production', '1. プリプロダクション（企画・準備）', '--neon-purple',
-                    '映像制作の事前準備工程です。企画の方向性を決めるディレクション、絵コンテ作成、ロケハン（撮影場所の下見）等が含まれます。')}
-                  {renderPhaseTable('Production', '2. プロダクション（撮影・収録）', '--neon-pink',
-                    '実際の撮影・収録工程です。カメラマン、照明技師、出演者など現場スタッフや機材・スタジオ費が含まれます。CGのみの場合この工程は発生しません。')}
-                  {renderPhaseTable('Post-Production', '3. ポストプロダクション（CG・編集・音響）', '--neon-cyan',
-                    '撮影後の制作工程です。CGアニメーション、3Dモデリング、エフェクト、編集、カラーグレーディング、音楽・MAなどの仕上げ作業が含まれます。通常納期は1ヶ月半からとなります。')}                  
+                  {renderPhaseTable('Planning', '1. 企画構成費', '--neon-purple',
+                    '企画の方向性を決めるディレクション、絵コンテ・Vコンテ作成などの企画構成にかかる費用です。')}
+                  {renderPhaseTable('Pre-Production', '2. 制作準備費', '--neon-purple',
+                    'ロケハン（撮影場所の下見）、現地調査など制作前の準備にかかる費用です。')}
+                  {renderPhaseTable('Shooting', '3. 撮影費', '--neon-pink',
+                    '実際の撮影・収録工程です。カメラマン、照明技師など現場スタッフや機材・スタジオ費が含まれます。')}
+                  {renderPhaseTable('Cast', '4. 出演者関係費', '--neon-pink',
+                    'モデル・タレント・インフルエンサーの出演費、使用権、ヘアメイク・スタイリスト費用です。')}
+                  {renderPhaseTable('CG', '5. CG/アニメーション・素材制作費', '--neon-cyan',
+                    'CGアニメーション、3Dモデリング、エフェクト、AI素材生成などの素材制作にかかる費用です。')}
+                  {renderPhaseTable('Post-Production', '6. ポストプロダクション（編集）', '--neon-cyan',
+                    'オフライン編集、カラーグレーディング、オンライン編集、テロップ・字幕制作などの仕上げ工程です。')}
+                  {renderPhaseTable('Audio', '7. 音楽・音響費', '--neon-cyan',
+                    'ナレーション収録、BGM制作、MA・整音作業、効果音などの音響にかかる費用です。')}
                   
                   {/* ADMIN CUSTOM ITEM ADDER */}
                   {isAdmin && (
@@ -2484,9 +2492,13 @@ function App() {
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
                         <div style={{ flex: 1 }}><label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>フェーズ</label>
                           <select className="input-field" value={newItem.phase} onChange={e => setNewItem({...newItem, phase: e.target.value as PhaseType})}>
-                            <option value="Pre-Production">Pre-Production (企画)</option>
-                            <option value="Production">Production (撮影等)</option>
-                            <option value="Post-Production">Post-Production (CG・編集)</option>
+                            <option value="Planning">企画構成費</option>
+                            <option value="Pre-Production">制作準備費</option>
+                            <option value="Shooting">撮影費</option>
+                            <option value="Cast">出演者関係費</option>
+                            <option value="CG">CG/アニメーション費</option>
+                            <option value="Post-Production">ポストプロダクション（編集）</option>
+                            <option value="Audio">音楽・音響費</option>
                           </select>
                         </div>
                         <div style={{ flex: 2 }}><label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>項目名</label><input type="text" className="input-field" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} placeholder="例：特殊レンズレンタル費" /></div>
@@ -2499,7 +2511,7 @@ function App() {
                     </div>
                   )}
 
-                  {renderPhaseTable('Overhead', '4. 制作間接費・予備費', '--text-main',
+                  {renderPhaseTable('Overhead', '8. 制作管理費・予備費', '--text-main',
                     'データ管理、機材保守、通信費等の諸経費です。仕様変更の可能性がある場合は予備費（バッファ）も含まれます。')}
                   {renderPhaseTable('Discount', 'パートナー割引', '--neon-green')}
                   {renderPhaseTable('Express', '特急対応オプション', '--neon-pink',
