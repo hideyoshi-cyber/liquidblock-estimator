@@ -487,6 +487,7 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
     if (answers['shooting'] === 'multi') { addLine('Shooting', 'カメラアシスタント', 35000, 2, sDays, '人日'); }
     addLine('Shooting', 'カメラ機材レンタル費（カメラ・レンズ）', 80000, undefined, sDays, '日');
     addLine('Shooting', '音声収録機材費', 20000, undefined, sDays, '日');
+    addLine('Shooting', '録音技師', 50000, 1, sDays, '人日');
     // 照明機材: 照明スタッフがいる場合のみ
     const hasLighting = answers['location'] === 'studio' || answers['shooting'] === 'multi' || answers['lighting'] === 'lighting_yes';
     if (hasLighting) addLine('Shooting', '照明機材レンタル費', 40000, undefined, sDays, '日');
