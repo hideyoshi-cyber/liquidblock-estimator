@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Video, Wand2, Camera, Timer, Layers, Sparkles, Crown, 
-  ArrowLeft, CheckCircle, CheckCircle2, Download, FileText,
+  ArrowLeft, ArrowRight, CheckCircle, CheckCircle2, Download, FileText,
   Monitor, Smartphone, Maximize, Mic, Users, Building, TreePine, CalendarDays, Clock,
   Music, Briefcase, Film, UserCircle, ShieldAlert, FileQuestion, FileCheck, Zap, Box, Palette,
   Globe, Headphones, UserPlus, Star, Mail, Phone, User, FileSignature, Box as BoxIcon, FileBadge2,
@@ -364,6 +364,7 @@ const questions: Question[] = [
       { id: '2d_motion', label: '2D モーショングラフィックス', icon: Palette, desc: 'インフォグラフィック・UIアニメーション等' },
       { id: '3d_product', label: '3D モデリング＆アニメーション', icon: Box, desc: '製品の3D化、建築パース等の立体表現' },
       { id: 'full_3d_vfx', label: 'ハイエンド 3D / VFX合成', icon: Sparkles, desc: 'キャラクターアニメ・実写への高度なCG合成' },
+      { id: 'ai_animation', label: 'AIアニメーション制作', icon: Wand2, desc: 'AI生成でキャラクター・背景・アニメーションを制作' },
       { id: 'partial', label: '部分発注（必要な工程のみ）', icon: Layers, desc: '特定の工程のみを個別に発注したい' },
   ]},
   { id: 'cg_deadline', title: 'CG制作の希望納期は？', condition: (ans) => {
@@ -430,7 +431,7 @@ const questions: Question[] = [
       { id: 'ja_only', label: '日本語のみ', icon: FileText, desc: '国内向け展開' },
       { id: 'multi_lang', label: '英語字幕等・他言語対応', icon: Globe, desc: '海外向けテロップや字幕の追加制作' },
   ]},
-  { id: 'ai_assets', title: 'AI素材制作は必要ですか？', options: [
+  { id: 'ai_assets', title: 'AI素材制作は必要ですか？', condition: (ans) => ans['cg_type'] !== 'ai_animation', options: [
       { id: 'ai_none', label: 'AI素材不要', icon: FileText, desc: '実写撮影・CG制作のみで対応' },
       { id: 'ai_light', label: 'AI素材あり（少量）', icon: Wand2, desc: '背景・静止画を数点AIで生成' },
       { id: 'ai_heavy', label: 'AI素材あり（大量）', icon: Sparkles, desc: 'AIモデル・動画・静止画を積極的に活用' },
@@ -561,7 +562,7 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
       addLine('CG', 'コンポジット (After Effects)', CG_RATE, Math.max(1, Math.round(2 * deadlinePersonsMul)), Math.max(3, Math.round(8 * deadlineDaysMul)), '人日');
     } else if (answers['cg_type'] === 'partial') {
       // 部分発注: cgPartialItemsに含まれる工程のみ
-      const partialMap: Record<string, { name: string; baseDays: number }> = {
+      const partialMap: Record<string, { name: string; baseDays: number; rate?: number; unit?: string; phase?: string }> = {
         '2d_anim': { name: '2Dアニメーション (After Effects)', baseDays: 10 },
         '2d_asset': { name: '2Dアセットデザイン (After Effects)', baseDays: 5 },
         '2d_graphic': { name: '2Dグラフィック素材 (Illustrator・Photoshop)', baseDays: 5 },
@@ -573,16 +574,41 @@ const calculateEstimate = (answers: Record<string, string>, customItems: LineIte
         '2d_fx': { name: '2Dエフェクト (After Effects)', baseDays: 5 },
         '3d_fx': { name: '3Dエフェクト (Cinema4D・Blender)', baseDays: 5 },
         '3d_model': { name: '3Dモデリング (Cinema4D・Blender)', baseDays: 10 },
+        'ai_chara': { name: 'AIキャラクター制作', baseDays: 2, rate: 50000, unit: '点' },
+        'ai_bg': { name: 'AI背景制作', baseDays: 3, rate: 6000, unit: '点' },
+        'ai_world': { name: 'AI世界観イメージ制作', baseDays: 1, rate: 15000, unit: '点' },
+        'ai_anim': { name: 'AIアニメーション制作', baseDays: 5, rate: 50000, unit: 'カット' },
+        'ae_comp': { name: 'AEコンポジット', baseDays: 3, rate: 50000 },
+        'ai_narration': { name: 'AIナレーション制作', baseDays: 1, rate: 20000, unit: '式', phase: 'Audio' },
+        'ai_credit': { name: 'AIクレジット費用（API・クラウド利用費）', baseDays: 1, rate: 50000, unit: 'プロジェクト' },
       };
       cgPartialItems.forEach(key => {
         const item = partialMap[key];
         if (item) {
-          addLine('CG', item.name, CG_RATE, 1, Math.max(1, Math.round(item.baseDays * deadlineDaysMul)), '人日');
+          const rate = item.rate || CG_RATE;
+          const unit = item.unit || '人日';
+          const phase = (item.phase || 'CG') as PhaseType;
+          addLine(phase, item.name, rate, unit === '人日' ? 1 : undefined, Math.max(1, Math.round(item.baseDays * deadlineDaysMul)), unit);
         }
       });
+    } else if (answers['cg_type'] === 'ai_animation') {
+      // AIアニメーション制作
+      // カット数・キャラ数は尺に応じて調整
+      const isLong = answers['length'] === '60s_plus' || answers['length'] === 'long';
+      const cutCount = isLong ? 10 : 5;
+      const charaCount = 2;
+      const bgCount = isLong ? 5 : 3;
+      addLine('CG', 'AIキャラクター制作', 50000, undefined, charaCount, '点');
+      addLine('CG', 'AI背景制作', 6000, undefined, bgCount, '点');
+      addLine('CG', 'AI世界観イメージ制作', 15000, undefined, 1, '点');
+      addLine('CG', 'AIアニメーション制作', 50000, undefined, cutCount, 'カット');
+      addLine('CG', 'AEコンポジット', 50000, 1, Math.max(2, Math.round(3 * deadlineDaysMul)), '人日');
+      addLine('Post-Production', '映像編集・カラーグレーディング', 50000, 1, Math.max(2, Math.round(3 * deadlineDaysMul)), '人日');
+      addLine('Audio', 'AIナレーション制作', 20000, undefined, 1, '式');
+      addLine('CG', 'AIクレジット費用（API・クラウド利用費）', 50000, undefined, 1, 'プロジェクト');
     }
-    // レンダリングサーバー（部分発注で工程がない場合はスキップ）
-    if (answers['cg_type'] !== 'partial' || cgPartialItems.length > 0) {
+    // レンダリングサーバー（部分発注で工程がない場合・AIアニメーションはスキップ）
+    if (answers['cg_type'] !== 'ai_animation' && (answers['cg_type'] !== 'partial' || cgPartialItems.length > 0)) {
       addLine('CG', 'レンダリングサーバー使用費', 30000, undefined, Math.max(3, Math.round(10 * deadlineDaysMul)), '日');
     }
 
@@ -1008,6 +1034,8 @@ function App() {
     }
     const newAnswers = { ...answers, [questionId]: optionId };
     setAnswers(newAnswers);
+    // 部分発注選択時は自動遷移しない（チェックボックス操作が必要）
+    if (questionId === 'cg_type' && optionId === 'partial') return;
     setTimeout(() => {
       const newVisible = questions.filter(q => !q.condition || q.condition(newAnswers));
       const currentIdx = newVisible.findIndex(q => q.id === questionId);
@@ -1346,6 +1374,10 @@ function App() {
       data.push(['■ 案件概要・備考']); merges.push({ s: { r, c: 0 }, e: { r, c: 6 } }); r++;
       data.push(['', projectNotes]); merges.push({ s: { r, c: 1 }, e: { r, c: 6 } }); r++;
     }
+
+    // === 算定基準注釈 ===
+    data.push([]); r++;
+    data.push(['※ 本見積の算定基準: JAC（日本アド・コンテンツ制作協会）TVCM制作費見積書式 / JAGDA（日本グラフィックデザイナー協会）制作料金算定基準に準拠']); merges.push({ s: { r, c: 0 }, e: { r, c: 6 } }); r++;
 
     // Build worksheet
     const ws = XLSX.utils.aoa_to_sheet(data);
@@ -1719,6 +1751,7 @@ function App() {
       <header style={{ padding: '0 48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10, background: 'var(--brand-red)', height: '48px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: isAdmin ? 'pointer' : 'default' }} onClick={() => { if (isAdmin) setViewMode('dashboard'); }}>
           <h2 style={{ fontSize: '15px', margin: 0, fontWeight: 700, letterSpacing: '2px', color: '#fff', textTransform: 'uppercase' }}>LIQUIDBLOCK <span style={{ fontWeight: 400, fontSize: '13px', letterSpacing: '1px', opacity: 0.85 }}>Estimator</span></h2>
+          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.6)', letterSpacing: '0.5px', marginLeft: '0px', display: 'block', marginTop: '1px' }}>JAC TVCM制作費見積書式 / JAGDA制作料金算定基準 準拠</span>
           {isAdmin && <span style={{ fontSize: '11px', color: '#fff', border: '1px solid rgba(255,255,255,0.5)', padding: '2px 8px', borderRadius: '0', marginLeft: '8px' }}>ADMIN</span>}
         </div>
         
@@ -1915,6 +1948,13 @@ function App() {
                       { key: '3d_anim', label: '3Dアニメーション (C4D/Blender)', days: 8 },
                       { key: '3d_fx', label: '3Dエフェクト (C4D/Blender)', days: 5 },
                       { key: 'comp', label: 'コンポジット (AE)', days: 5 },
+                      { key: 'ai_chara', label: 'AIキャラクター制作', days: 2, unit: '点', price: 50000 },
+                      { key: 'ai_bg', label: 'AI背景制作', days: 3, unit: '点', price: 6000 },
+                      { key: 'ai_world', label: 'AI世界観イメージ', days: 1, unit: '点', price: 15000 },
+                      { key: 'ai_anim', label: 'AIアニメーション', days: 5, unit: 'カット', price: 50000 },
+                      { key: 'ae_comp', label: 'AEコンポジット', days: 3, price: 50000 },
+                      { key: 'ai_narration', label: 'AIナレーション', days: 1, unit: '式', price: 20000 },
+                      { key: 'ai_credit', label: 'AIクレジット費用', days: 1, unit: 'プロジェクト', price: 50000 },
                     ].map(item => {
                       const isChecked = cgPartialItems.includes(item.key);
                       return (
@@ -1938,8 +1978,14 @@ function App() {
                     })}
                   </div>
                   {cgPartialItems.length > 0 && (
-                    <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--brand-red)' }}>
-                      {cgPartialItems.length}工程を選択中
+                    <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '13px', color: 'var(--brand-red)', fontWeight: 600 }}>{cgPartialItems.length}工程を選択中</span>
+                      <button className="btn-primary" onClick={() => {
+                        const newVisible = questions.filter(q => !q.condition || q.condition(answers));
+                        const currentIdx = newVisible.findIndex(q => q.id === 'cg_type');
+                        if (currentIdx < newVisible.length - 1) setCurrentStep(questions.findIndex(q => q.id === newVisible[currentIdx + 1].id));
+                        else setShowConfirmScreen(true);
+                      }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px' }}>次の質問へ進む <ArrowRight size={16} /></button>
                     </div>
                   )}
                 </div>
@@ -2279,6 +2325,9 @@ function App() {
                       <div style={{ fontSize: '11px', fontWeight: 700, color: '#92400E', marginBottom: '4px' }}>※ 暫定見積</div>
                       <p style={{ fontSize: '11px', color: '#78350F', lineHeight: 1.6, margin: 0 }}>
                         本書面はお客様のご選択に基づく概算金額です。正式なお見積りは、担当者による精査・ヒアリング後に改めてご提示いたします。
+                      </p>
+                      <p style={{ fontSize: '10px', color: '#92400E', lineHeight: 1.5, margin: '6px 0 0 0', opacity: 0.8 }}>
+                        ※ 本見積の算定基準: JAC（日本アド・コンテンツ制作協会）TVCM制作費見積書式・カテゴリ分類 / JAGDA（日本グラフィックデザイナー協会）制作料金算定基準に準拠して算出しています。
                       </p>
                     </div>
                   </div>
