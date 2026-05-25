@@ -10,6 +10,8 @@ import {
   Link, Paperclip, Image, X, GripVertical, MapPin
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { searchCompany, addCustomCompany, removeCustomCompany, getCustomCompanies, companyDatabase, classifyCompanyViaAPI } from './companyDatabase';
+import type { CompanyEntry, AIClassificationResult } from './companyDatabase';
 
 // Backend API base URL
 const API_BASE = 'http://localhost:3001';
@@ -333,7 +335,7 @@ const contractTerms = [
 
 // --- Mock Data ---
 const questions: Question[] = [
-  { id: 'client_type', title: '貴社の業種（発注元）をお聞かせください', options: [
+  { id: 'client_type', title: '貴社の業種（発注元）をお聞かせください', condition: (ans) => !ans['client_type'], options: [
       { id: 'end_client', label: '一般企業 (直取引)', icon: UserCircle, desc: '自社のサービス・製品のための映像制作' },
       { id: 'agency', label: '広告代理店', icon: Briefcase, desc: 'クライアントワークの企画・プロデュース' },
       { id: 'production', label: '映像制作会社', icon: Film, desc: '同業者様からのCG・VFX等の外注依頼' },
@@ -884,6 +886,13 @@ function App() {
   const [hoveredCategoryId, setHoveredCategoryId] = useState<string | null>(null);
   const [deadlinePopupId, setDeadlinePopupId] = useState<string | null>(null);
   const [contractAgreed, setContractAgreed] = useState(false);
+  const [showCompanyVerification, setShowCompanyVerification] = useState(true);
+  const [selectedClientType, setSelectedClientType] = useState<string>('');
+  const [companySuggestions, setCompanySuggestions] = useState<CompanyEntry[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [companyMatchInfo, setCompanyMatchInfo] = useState<CompanyEntry | null>(null);
+  const [aiClassification, setAiClassification] = useState<AIClassificationResult | null>(null);
+  const [isClassifying, setIsClassifying] = useState(false);
 
   // Customer Library
   const [customerLibrary, setCustomerLibrary] = useState<CustomerInfo[]>(() => {
@@ -1030,6 +1039,8 @@ function App() {
     setShowCustomerInput(false);
     setIsSubmitted(false);
     setActiveProject(null);
+    setSelectedClientType('');
+    setShowCompanyVerification(true);
     setViewMode('wizard');
   };
 
@@ -1334,13 +1345,14 @@ function App() {
     const phaseLabels: Record<string, string> = { 'Planning': '企画構成費', 'Pre-Production': '制作準備費', 'Shooting': '撮影費', 'Cast': '出演者関係費', 'CG': 'CG/アニメーション費', 'Post-Production': 'ポストプロダクション', 'Audio': '音楽・音響費', 'Overhead': '制作管理費', 'Express': '特急料金' };
 
     // 表示モード: 一般企業・代理店はsummary（カテゴリ合計のみ）
-    const isExcelSummary = !isAdmin && (answers['client_type'] === 'end_client' || answers['client_type'] === 'agency');
+    // ただし特急料金（Express）オプション等は詳細表示を強制する
 
     for (const phase of phases) {
       const phaseItems = items.filter(i => i.phase === phase);
       if (phaseItems.length === 0) continue;
 
       const phaseTotal = phaseItems.reduce((sum, i) => sum + (i.isEstimateOnly ? 0 : i.amount), 0);
+      const isExcelSummary = !isAdmin && (answers['client_type'] === 'end_client' || answers['client_type'] === 'agency') && phase !== 'Express';
 
       if (isExcelSummary) {
         // 集約モード: カテゴリ名と合計のみ
@@ -1584,6 +1596,77 @@ function App() {
             </tbody>
           </table>
         </div>
+
+        {/* === 会社データベース管理 === */}
+        <div className="glass-panel" style={{ padding: '24px', marginTop: '24px' }}>
+          <h2 style={{ fontSize: '16px', margin: '0 0 16px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Building size={18} /> 会社データベース管理
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400, marginLeft: '8px' }}>
+              組込み: {companyDatabase.length}社 ／ カスタム追加: {getCustomCompanies().length}社
+            </span>
+          </h2>
+
+          {/* 新規登録フォーム */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 2, minWidth: '200px' }}>
+              <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>会社名</label>
+              <input id="admin-company-name" type="text" placeholder="株式会社○○" style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-section)', border: '1px solid var(--border-color)', borderRadius: '2px', color: 'var(--text-primary)', fontSize: '14px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ flex: 1, minWidth: '140px' }}>
+              <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>業種</label>
+              <select id="admin-company-type" defaultValue="end_client" style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-section)', border: '1px solid var(--border-color)', borderRadius: '2px', color: 'var(--text-primary)', fontSize: '14px', fontFamily: 'inherit', outline: 'none' }}>
+                <option value="end_client">一般企業</option>
+                <option value="agency">広告代理店/デザイン</option>
+                <option value="production">映像制作会社</option>
+                <option value="cg_production">CG制作会社</option>
+              </select>
+            </div>
+            <div style={{ flex: 1, minWidth: '120px' }}>
+              <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>サブカテゴリ</label>
+              <input id="admin-company-sub" type="text" placeholder="例: メーカー" style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-section)', border: '1px solid var(--border-color)', borderRadius: '2px', color: 'var(--text-primary)', fontSize: '14px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+            <button
+              className="btn-primary"
+              style={{ padding: '8px 20px', whiteSpace: 'nowrap', height: '38px' }}
+              onClick={() => {
+                const nameEl = document.getElementById('admin-company-name') as HTMLInputElement;
+                const typeEl = document.getElementById('admin-company-type') as HTMLSelectElement;
+                const subEl = document.getElementById('admin-company-sub') as HTMLInputElement;
+                if (!nameEl?.value.trim()) return;
+                addCustomCompany({
+                  name: nameEl.value.trim(),
+                  type: typeEl.value as 'agency' | 'production' | 'cg_production' | 'end_client',
+                  sub: subEl.value.trim() || undefined,
+                });
+                nameEl.value = '';
+                subEl.value = '';
+                // Force re-render
+                setProjects([...projects]);
+              }}
+            ><Plus size={14} /> 登録</button>
+          </div>
+
+          {/* カスタム追加済みリスト */}
+          {getCustomCompanies().length > 0 && (
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>カスタム追加済み企業一覧</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {getCustomCompanies().map((c, i) => {
+                  const typeLabel = c.type === 'agency' ? '代理店' : c.type === 'production' ? '制作' : c.type === 'cg_production' ? 'CG' : '一般';
+                  const typeColor = c.type === 'agency' ? '#3B82F6' : c.type === 'production' ? '#10B981' : c.type === 'cg_production' ? '#8B5CF6' : '#F59E0B';
+                  return (
+                    <div key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'var(--bg-section)', border: '1px solid var(--border-subtle)', borderRadius: '2px', fontSize: '12px' }}>
+                      <span style={{ color: typeColor, fontWeight: 600 }}>[{typeLabel}]</span>
+                      <span style={{ color: 'var(--text-primary)' }}>{c.name}</span>
+                      {c.sub && <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>({c.sub})</span>}
+                      <button onClick={() => { removeCustomCompany(c.name); setProjects([...projects]); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0 2px', fontSize: '14px', lineHeight: 1 }}>×</button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -1614,7 +1697,8 @@ function App() {
     const phaseTotal = phaseItems.reduce((acc, i) => acc + i.amount, 0);
 
     // 表示モード判定: 一般企業・代理店はsummary、制作会社はdetailed、Adminは常にdetailed
-    const isSummaryMode = !isAdmin && (answers['client_type'] === 'end_client' || answers['client_type'] === 'agency');
+    // ただし、特急料金（Express）は「特別対応オプション」の内訳として別に詳細表示させる
+    const isSummaryMode = !isAdmin && (answers['client_type'] === 'end_client' || answers['client_type'] === 'agency') && phase !== 'Express';
 
     if (isSummaryMode) {
       // 集約モード: カテゴリ名と合計金額のみ
@@ -1788,7 +1872,7 @@ function App() {
           {isAdmin && <span style={{ fontSize: '11px', color: '#fff', border: '1px solid rgba(255,255,255,0.5)', padding: '2px 8px', borderRadius: '0', marginLeft: '8px' }}>ADMIN</span>}
         </div>
         
-        {viewMode === 'wizard' && !isFinished && !showConfirmScreen && !showCustomerInput && (
+        {viewMode === 'wizard' && !isFinished && !showConfirmScreen && !showCustomerInput && !showCompanyVerification && (
           <div style={{ display: 'flex', gap: '8px' }}>
             {visibleQuestions.map((q, idx) => {
               const isActiveOrPast = visibleQuestions.findIndex(vq => vq.id === currentQuestion.id) >= idx;
@@ -1804,7 +1888,246 @@ function App() {
 
       <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px', overflowY: 'auto' }}>
         <AnimatePresence mode="wait">
-          {viewMode === 'wizard' && !isFinished && !showConfirmScreen && !showCustomerInput ? (
+          {/* === 会社情報入力 & 業種選択（ウィザード前） === */}
+          {viewMode === 'wizard' && showCompanyVerification ? (
+            <motion.div key="company-verify" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.4 }} style={{ width: '100%', maxWidth: '640px', paddingBottom: '100px' }}>
+              <div style={{ marginBottom: '40px', textAlign: 'center' }}>
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(208, 2, 27, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}><Building size={28} color="var(--brand-red)" /></div>
+                <h1 style={{ fontSize: '32px', margin: '0 0 8px 0', lineHeight: 1.3 }}>貴社情報のご入力</h1>
+                <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: 0, lineHeight: 1.6 }}>見積書に記載する貴社情報と業種をご入力ください。<br/>法人番号システムによる照合は準備中です。</p>
+              </div>
+
+              <div style={{ background: 'var(--bg-section)', borderRadius: '2px', padding: '32px', border: '1px solid var(--border-subtle)', marginBottom: '24px' }}>
+                <div style={{ marginBottom: '20px', position: 'relative' }}>
+                  <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 500 }}>貴社名 <span style={{ color: 'var(--brand-red)' }}>*</span></label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '2px solid var(--border-color)', paddingBottom: '8px' }}>
+                    <Building size={18} color="var(--text-muted)" />
+                    <input type="text" value={customerInfo.companyName}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setCustomerInfo({...customerInfo, companyName: v});
+                        setAiClassification(null);
+                        const hits = searchCompany(v);
+                        setCompanySuggestions(hits);
+                        setShowSuggestions(hits.length > 0 && v.length >= 2);
+                        if (hits.length === 0) {
+                          setCompanyMatchInfo(null);
+                        }
+                      }}
+                      onFocus={() => { if (companySuggestions.length > 0) setShowSuggestions(true); }}
+                      onBlur={async () => {
+                        setTimeout(() => setShowSuggestions(false), 200);
+                        // DBにヒットせず、3文字以上の会社名が入力された場合、AI分類を実行
+                        const name = customerInfo.companyName.trim();
+                        if (!companyMatchInfo && name.length >= 3) {
+                          const dbHits = searchCompany(name);
+                          const exactMatch = dbHits.find(h => h.name === name);
+                          if (!exactMatch) {
+                            setIsClassifying(true);
+                            try {
+                              const result = await classifyCompanyViaAPI(name, API_BASE);
+                              if (result) {
+                                setAiClassification(result);
+                                setSelectedClientType(result.type);
+                              } else {
+                                // API不可の場合はend_clientにフォールバック
+                                setSelectedClientType('end_client');
+                              }
+                            } catch {
+                              setSelectedClientType('end_client');
+                            } finally {
+                              setIsClassifying(false);
+                            }
+                          }
+                        }
+                      }}
+                      placeholder="会社名を入力すると候補が表示されます"
+                      style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '16px', fontFamily: 'inherit' }} />
+                  </div>
+                  {/* オートコンプリートドロップダウン */}
+                  {showSuggestions && companySuggestions.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: 'var(--bg-section)', border: '1px solid var(--border-color)', borderRadius: '0 0 2px 2px', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', maxHeight: '240px', overflowY: 'auto' }}>
+                      {companySuggestions.map((c, idx) => {
+                        const typeLabel = c.sub || (c.type === 'agency' ? '広告代理店' : c.type === 'production' ? '映像制作会社' : c.type === 'cg_production' ? 'CG制作会社' : '一般企業');
+                        const typeColor = c.type === 'agency' ? '#3B82F6' : c.type === 'production' ? '#10B981' : c.type === 'cg_production' ? '#8B5CF6' : '#F59E0B';
+                        return (
+                          <div key={idx}
+                            onMouseDown={() => {
+                              setCustomerInfo({...customerInfo, companyName: c.name});
+                              setSelectedClientType(c.type);
+                              setCompanyMatchInfo(c);
+                              setAiClassification(null);
+                              setShowSuggestions(false);
+                              setCompanySuggestions([]);
+                            }}
+                            style={{ padding: '10px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', transition: 'background 0.15s' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(208,2,27,0.04)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{c.name}</span>
+                            <span style={{ fontSize: '11px', color: typeColor, background: `${typeColor}11`, padding: '2px 8px', borderRadius: '2px', fontWeight: 500 }}>{typeLabel}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* マッチ結果表示 - DBヒット */}
+                  {companyMatchInfo && (
+                    <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <CheckCircle size={14} color="#10B981" />
+                      <span style={{ fontSize: '12px', color: '#10B981' }}>データベースで照合済み: {companyMatchInfo.sub || (companyMatchInfo.type === 'agency' ? '広告代理店' : companyMatchInfo.type === 'production' ? '映像制作会社' : companyMatchInfo.type === 'cg_production' ? 'CG制作会社' : '一般企業')}として自動判定されました</span>
+                    </div>
+                  )}
+                  {/* AI分類中ローディング */}
+                  {isClassifying && (
+                    <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(139, 92, 246, 0.06)', border: '1px solid rgba(139, 92, 246, 0.2)', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Wand2 size={14} color="#8B5CF6" style={{ animation: 'spin 1s linear infinite' }} />
+                      <span style={{ fontSize: '12px', color: '#8B5CF6' }}>🤖 AI が業種を判定中...</span>
+                    </div>
+                  )}
+                  {/* AI分類結果表示 */}
+                  {!companyMatchInfo && !isClassifying && aiClassification && (
+                    <div style={{ marginTop: '8px', padding: '10px 12px', background: aiClassification.confidence >= 0.7 ? 'rgba(139, 92, 246, 0.06)' : 'rgba(245, 158, 11, 0.06)', border: `1px solid ${aiClassification.confidence >= 0.7 ? 'rgba(139, 92, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`, borderRadius: '2px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <Wand2 size={14} color={aiClassification.confidence >= 0.7 ? '#8B5CF6' : '#F59E0B'} />
+                        <span style={{ fontSize: '12px', color: aiClassification.confidence >= 0.7 ? '#8B5CF6' : '#F59E0B', fontWeight: 600 }}>
+                          🤖 AI判定: {aiClassification.type === 'agency' ? '広告代理店' : aiClassification.type === 'production' ? '映像制作会社' : aiClassification.type === 'cg_production' ? 'CG制作会社' : '一般企業'}
+                          {aiClassification.sub ? ` (${aiClassification.sub})` : ''}
+                          （確信度: {Math.round(aiClassification.confidence * 100)}%）
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', paddingLeft: '22px' }}>
+                        {aiClassification.reason}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 500 }}>ご担当者名 <span style={{ color: 'var(--brand-red)' }}>*</span></label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '2px solid var(--border-color)', paddingBottom: '8px' }}>
+                      <User size={18} color="var(--text-muted)" />
+                      <input type="text" value={customerInfo.contactName} onChange={e => setCustomerInfo({...customerInfo, contactName: e.target.value})} placeholder="山田 太郎" style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '15px', fontFamily: 'inherit' }} />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 500 }}>電話番号</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '2px solid var(--border-color)', paddingBottom: '8px' }}>
+                      <Phone size={18} color="var(--text-muted)" />
+                      <input type="text" value={customerInfo.phone} onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})} placeholder="03-0000-0000" style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '15px', fontFamily: 'inherit' }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 500 }}>住所 <span style={{ color: 'var(--brand-red)' }}>*</span></label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '2px solid var(--border-color)', paddingBottom: '8px' }}>
+                    <TreePine size={18} color="var(--text-muted)" />
+                    <input type="text" value={customerInfo.address} onChange={e => setCustomerInfo({...customerInfo, address: e.target.value})} placeholder="東京都渋谷区○○ 1-2-3 ○○ビル5F" style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '15px', fontFamily: 'inherit' }} />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 500 }}>メールアドレス <span style={{ color: 'var(--brand-red)' }}>*</span></label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '2px solid var(--border-color)', paddingBottom: '8px' }}>
+                    <Mail size={18} color="var(--text-muted)" />
+                    <input type="text" value={customerInfo.email} onChange={e => setCustomerInfo({...customerInfo, email: e.target.value})} placeholder="info@example.com" style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: '15px', fontFamily: 'inherit' }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* 業種選択 または 問い合わせ誘導 */}
+              {(!companyMatchInfo && customerInfo.companyName.trim().length >= 2) ? (
+                <div style={{ textAlign: 'center', marginTop: '32px', marginBottom: '24px' }}>
+                  <div style={{ background: 'rgba(208, 2, 27, 0.04)', border: '1px solid rgba(208, 2, 27, 0.15)', borderRadius: '2px', padding: '24px', marginBottom: '24px' }}>
+                    <p style={{ margin: '0 0 12px 0', color: 'var(--brand-red)', fontWeight: 600, fontSize: '15px' }}>システム未登録</p>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.6 }}>現在、こちらの会社は自動見積もりシステムに登録されていません。<br/>恐れ入りますが、以下のボタンより直接お問い合わせをお願いいたします。</p>
+                  </div>
+                  <a
+                    href={`mailto:info@liquid-block.com?subject=${encodeURIComponent('[LiquidBlock] 映像制作のお見積り・お問い合わせ')}&body=${encodeURIComponent(`以下のお客様よりお見積りのご依頼がありました。\n\n貴社名: ${customerInfo.companyName}\nご担当者名: ${customerInfo.contactName}\n電話番号: ${customerInfo.phone}\n住所: ${customerInfo.address}\nメールアドレス: ${customerInfo.email}\n\n---\nお見積りのご要望、ご相談内容をこちらにご記載ください:\n\n`)}`}
+                    className="btn-primary"
+                    style={{
+                      padding: '14px 48px', fontSize: '16px', display: 'inline-flex', alignItems: 'center', gap: '8px', textDecoration: 'none'
+                    }}
+                  >
+                    メールで問い合わせる <Mail size={18} />
+                  </a>
+                </div>
+              ) : (
+                <>
+                  <div style={{ background: 'var(--bg-section)', borderRadius: '2px', padding: '24px 32px', border: '1px solid var(--border-subtle)', marginBottom: '24px' }}>
+                <label style={{ display: 'block', fontSize: '14px', color: 'var(--text-primary)', marginBottom: '16px', fontWeight: 600 }}>貴社の業種をお選びください <span style={{ color: 'var(--brand-red)' }}>*</span></label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  {[
+                    { id: 'end_client', label: '一般企業 (直取引)', icon: UserCircle, desc: '自社サービス・製品の映像制作' },
+                    { id: 'agency', label: '広告代理店', icon: Briefcase, desc: '企画・プロデュース' },
+                    { id: 'production', label: '映像制作会社', icon: Film, desc: 'CG・VFX等の外注依頼' },
+                    { id: 'cg_production', label: 'CG制作会社', icon: Box, desc: '協業・外注依頼' },
+                  ].map(opt => {
+                    const Icon = opt.icon;
+                    const isSelected = selectedClientType === opt.id;
+                    return (
+                      <div key={opt.id} onClick={() => { if (!companyMatchInfo) setSelectedClientType(opt.id); }} style={{
+                        display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px',
+                        background: isSelected ? 'rgba(208, 2, 27, 0.06)' : 'transparent',
+                        border: isSelected ? '2px solid var(--brand-red)' : '1px solid var(--border-color)',
+                        borderRadius: '2px', cursor: companyMatchInfo ? (isSelected ? 'default' : 'not-allowed') : 'pointer', transition: 'all 0.2s ease',
+                        opacity: companyMatchInfo && !isSelected ? 0.3 : 1
+                      }}>
+                        <Icon size={20} color={isSelected ? 'var(--brand-red)' : 'var(--text-muted)'} />
+                        <div>
+                          <div style={{ fontSize: '14px', fontWeight: isSelected ? 600 : 400, color: isSelected ? 'var(--brand-red)' : 'var(--text-primary)' }}>{opt.label}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{opt.desc}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 照合ステータス通知 */}
+              {companyMatchInfo ? (
+                <div style={{ background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '2px', padding: '12px 16px', marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <CheckCircle size={16} color="#10B981" />
+                  <span style={{ fontSize: '12px', color: '#10B981', lineHeight: 1.5 }}>業界データベースで「{companyMatchInfo.name}」が見つかりました。業種が自動判定されています。</span>
+                </div>
+              ) : (
+                <div style={{ background: 'rgba(59, 130, 246, 0.04)', border: '1px solid rgba(59, 130, 246, 0.15)', borderRadius: '2px', padding: '12px 16px', marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <ShieldAlert size={16} color="rgba(59, 130, 246, 0.7)" />
+                  <span style={{ fontSize: '12px', color: 'rgba(59, 130, 246, 0.8)', lineHeight: 1.5 }}>広告代理店・映像制作会社・CG制作会社のデータベースと照合します。未登録の場合は自動見積をご利用いただけません。</span>
+                </div>
+              )}
+
+              {/* 進行ボタン */}
+              <div style={{ textAlign: 'center' }}>
+                {(!customerInfo.companyName.trim() || !customerInfo.contactName.trim() || !customerInfo.address.trim() || !customerInfo.email.trim() || !selectedClientType) && (
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' }}>貴社名・ご担当者名・住所・メールアドレス・業種は必須項目です</p>
+                )}
+                <button
+                  className="btn-primary"
+                  disabled={!customerInfo.companyName.trim() || !customerInfo.contactName.trim() || !customerInfo.address.trim() || !customerInfo.email.trim() || !selectedClientType}
+                  onClick={() => {
+                    const initialAnswers = { client_type: selectedClientType };
+                    setAnswers(initialAnswers);
+                    setShowCompanyVerification(false);
+                    // 業種選択済みの状態から最初のSTEP（categoryなど）を特定してスキップする
+                    const firstVisible = questions.filter(q => !q.condition || q.condition(initialAnswers))[0];
+                    setCurrentStep(questions.findIndex(q => q.id === firstVisible.id));
+                    setWorkflowAgreed(false);
+                  }}
+                  style={{
+                    padding: '14px 48px', fontSize: '16px',
+                    opacity: (!customerInfo.companyName.trim() || !customerInfo.contactName.trim() || !customerInfo.address.trim() || !customerInfo.email.trim() || !selectedClientType) ? 0.4 : 1,
+                    cursor: (!customerInfo.companyName.trim() || !customerInfo.contactName.trim() || !customerInfo.address.trim() || !customerInfo.email.trim() || !selectedClientType) ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: '8px',
+                  }}
+                >見積を開始する <ArrowRight size={18} /></button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          ) : viewMode === 'wizard' && !isFinished && !showConfirmScreen && !showCustomerInput ? (
             // --- Wizard ---
             <motion.div key={currentStep} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.4 }} style={{ width: '100%', maxWidth: '800px', paddingBottom: '100px' }}>
               <div style={{ marginBottom: '40px', textAlign: 'center' }}>
@@ -2163,7 +2486,7 @@ function App() {
                     cursor: contractAgreed ? 'pointer' : 'not-allowed',
                   }}
                 >
-                  次へ：お客様情報の入力 →
+                  次へ：プロジェクト情報の入力 →
                 </button>
               </div>
             </motion.div>
@@ -2172,52 +2495,13 @@ function App() {
             <motion.div key="customer-input" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={{ width: '100%', maxWidth: '750px', paddingBottom: '80px' }}>
               <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                 <div style={{ width: '60px', height: '60px', background: 'rgba(124, 58, 237, 0.08)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
-                  <UserCircle size={28} style={{ color: '#7C3AED' }} />
+                  <FolderKanban size={28} style={{ color: '#7C3AED' }} />
                 </div>
-                <h1 style={{ fontSize: '28px', margin: '0 0 8px 0' }}>お客様情報・制作期間</h1>
-                <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>見積書に記載するお客様情報と制作スケジュールをご入力ください。後から編集も可能です。</p>
+                <h1 style={{ fontSize: '28px', margin: '0 0 8px 0' }}>プロジェクト情報・制作期間</h1>
+                <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>見積書に記載するプロジェクト案件名と予定制作スケジュールをご入力ください。</p>
               </div>
 
               <div className="glass-panel" style={{ padding: '28px' }}>
-                {/* 顧客ライブラリ呼び出し */}
-                {isAdmin && customerLibrary.length > 0 && (
-                  <div style={{ marginBottom: '20px', padding: '12px 16px', background: 'rgba(124, 58, 237, 0.04)', border: '1px solid rgba(124, 58, 237, 0.15)', borderRadius: '2px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '13px', color: '#7C3AED', fontWeight: 500 }}>顧客ライブラリから選択 ({customerLibrary.length}件)</span>
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {customerLibrary.map((c, idx) => (
-                        <button key={idx} onClick={() => setCustomerInfo({ ...c, projectName: customerInfo.projectName })}
-                          style={{ fontSize: '12px', padding: '4px 12px', background: 'var(--bg-section)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', borderRadius: '0', cursor: 'pointer', transition: 'all 0.2s' }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--neon-purple)'; e.currentTarget.style.background = 'rgba(139,92,246,0.1)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
-                        >{c.companyName}{c.contactName ? ` / ${c.contactName}` : ''}</button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ marginBottom: '20px' }}>
-                  <label className="form-label">プロジェクト名（案件名） <span style={{ color: 'var(--color-danger)' }}>*</span></label>
-                  <div style={{ position: 'relative' }}>
-                    <FolderKanban size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} />
-                    <input type="text" name="projectName" value={customerInfo.projectName} onChange={handleInputChange} className="input-field" placeholder="例：〇〇新商品プロモーション映像制作" style={{ paddingLeft: '40px' }} />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div className="form-group"><label className="form-label">貴社名 <span style={{ color: 'var(--color-danger)' }}>*</span></label><div style={{ position: 'relative' }}><Building size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} /><input type="text" name="companyName" value={customerInfo.companyName} onChange={handleInputChange} className="input-field" placeholder="株式会社〇〇" style={{ paddingLeft: '40px' }} /></div></div>
-                  <div className="form-group"><label className="form-label">ご担当者名 <span style={{ color: 'var(--color-danger)' }}>*</span></label><div style={{ position: 'relative' }}><User size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} /><input type="text" name="contactName" value={customerInfo.contactName} onChange={handleInputChange} className="input-field" placeholder="山田 太郎" style={{ paddingLeft: '40px' }} /></div></div>
-                  <div className="form-group"><label className="form-label">メールアドレス <span style={{ color: 'var(--color-danger)' }}>*</span></label><div style={{ position: 'relative' }}><Mail size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} /><input type="email" name="email" value={customerInfo.email} onChange={handleInputChange} className="input-field" placeholder="info@example.com" style={{ paddingLeft: '40px' }} /></div></div>
-                  <div className="form-group"><label className="form-label">電話番号</label><div style={{ position: 'relative' }}><Phone size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} /><input type="tel" name="phone" value={customerInfo.phone} onChange={handleInputChange} className="input-field" placeholder="03-0000-0000" style={{ paddingLeft: '40px' }} /></div></div>
-                </div>
-                <div className="form-group" style={{ marginBottom: '20px' }}>
-                  <label className="form-label">住所</label>
-                  <div style={{ position: 'relative' }}>
-                    <MapPin size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} />
-                    <input type="text" name="address" value={customerInfo.address} onChange={handleInputChange} className="input-field" placeholder="東京都渋谷区〇〇 1-2-3 〇〇ビル5F" style={{ paddingLeft: '40px' }} />
-                  </div>
-                </div>
 
                 {/* 制作期間 */}
                 <div style={{ padding: '16px', background: 'rgba(208, 2, 27, 0.04)', border: '1px solid rgba(208, 2, 27, 0.1)', borderRadius: '2px' }}>
@@ -2247,13 +2531,13 @@ function App() {
                   <ArrowLeft size={16} /> 選択内容に戻る
                 </button>
                 <button className="btn-primary" onClick={() => { setIsFinished(true); setShowCustomerInput(false); if (customerInfo.companyName) saveToCustomerLibrary(customerInfo); }} style={{ padding: '14px 40px', fontSize: '16px' }}
-                  disabled={!customerInfo.projectName || !customerInfo.companyName}
+                  disabled={!customerInfo.projectName}
                 >
                   見積書を作成 →
                 </button>
               </div>
-              {(!customerInfo.projectName || !customerInfo.companyName) && (
-                <div style={{ textAlign: 'center', marginTop: '12px', fontSize: '12px', color: 'var(--color-danger)' }}>※ プロジェクト名と貴社名は必須です</div>
+              {(!customerInfo.projectName) && (
+                <div style={{ textAlign: 'center', marginTop: '12px', fontSize: '12px', color: 'var(--color-danger)' }}>※ プロジェクト名は必須です</div>
               )}
             </motion.div>
           ) : isSubmitted ? (

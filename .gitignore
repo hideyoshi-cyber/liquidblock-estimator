@@ -24,3 +24,12 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Environment & secrets
+.env
+.env.*
+*.json
+!package.json
+!package-lock.json
+!tsconfig*.json
+!vite.config.ts

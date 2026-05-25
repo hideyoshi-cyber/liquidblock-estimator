@@ -3,7 +3,7 @@ import cors from 'cors';
 import multer from 'multer';
 import dotenv from 'dotenv';
 import { createProjectFolder, uploadFileToDrive } from './drive.js';
-import { analyzeReference, DirectionAnalysis } from './gemini.js';
+import { analyzeReference, DirectionAnalysis, classifyCompany, CompanyClassification } from './gemini.js';
 
 dotenv.config();
 
@@ -113,6 +113,26 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
+// --- Phase D: Company Classification ---
+
+/**
+ * POST /api/classify-company
+ * 会社名からGemini AIで業種を自動判定する
+ */
+app.post('/api/classify-company', async (req, res) => {
+  try {
+    const { companyName } = req.body;
+    if (!companyName || companyName.trim().length < 2) {
+      return res.status(400).json({ error: 'companyName is required (min 2 chars)' });
+    }
+    const classification: CompanyClassification = await classifyCompany(companyName.trim());
+    res.json(classification);
+  } catch (error: any) {
+    console.error('Company classification error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- Start Server ---
 app.listen(PORT, () => {
   console.log('');
@@ -121,6 +141,9 @@ app.listen(PORT, () => {
   console.log(`║  📡 Running on http://localhost:${PORT}       ║`);
   console.log('║  📁 Google Drive: Ready                     ║');
   console.log('║  🤖 Gemini AI: Ready                        ║');
+  console.log('║  🏢 Company Classifier: Ready               ║');
   console.log('╚════════════════════════════════════════════╝');
   console.log('');
 });
+
+

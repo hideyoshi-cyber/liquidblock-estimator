@@ -20,6 +20,13 @@ export interface DirectionAnalysis {
   suggestedApproach: string; // LiquidBlockとしての提案
 }
 
+export interface CompanyClassification {
+  type: 'agency' | 'production' | 'cg_production' | 'end_client';
+  confidence: number;    // 0.0 - 1.0
+  reason: string;        // 判定理由（日本語）
+  sub?: string;          // サブカテゴリ（例: "総合広告代理店", "VFXスタジオ"）
+}
+
 /**
  * アップロードされた画像をGemini APIで分析して方向性タグを返す
  */
@@ -88,3 +95,69 @@ JSONのみで回答し、それ以外のテキストは含めないでくださ�
     };
   }
 }
+
+/**
+ * 会社名からGemini AIで業種を判定する
+ */
+export async function classifyCompany(companyName: string): Promise<CompanyClassification> {
+  const ai = getGenAI();
+  const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+  const prompt = `あなたは日本の企業データベースの専門家です。以下の会社名の業種を判定してください。
+
+会社名: 「${companyName}」
+
+以下の4つのカテゴリから最も適切なものを1つ選んでください：
+- "agency" = 広告代理店、広告会社、デザイン会社、PR会社、マーケティング会社、メディアレップ、SP会社
+- "production" = 映像制作会社、映像プロダクション、テレビ制作会社、CM制作会社、ポストプロダクション
+- "cg_production" = CG制作会社、VFXスタジオ、ゲーム開発会社、アニメーション制作会社、3DCG専門会社
+- "end_client" = 上記以外の一般企業（メーカー、商社、金融、IT、小売、サービス業、官公庁、教育機関など）
+
+判定基準：
+- 会社名に「広告」「アド」「エージェンシー」「プランニング」「コミュニケーション」等が含まれる → agency の可能性が高い
+- 会社名に「映像」「プロダクション」「フィルム」「ムービー」「スタジオ」「ピクチャーズ」等が含まれる → production の可能性が高い
+- 会社名に「CG」「VFX」「デジタルアーツ」「グラフィックス」「ゲーム」「アニメ」等が含まれる → cg_production の可能性が高い
+- 有名企業の場合はその知識に基づいて判定してください
+- 判断が難しい場合は "end_client" にしてください
+
+以下のJSON形式のみで回答してください：
+{
+  "type": "agency|production|cg_production|end_client",
+  "confidence": 0.0〜1.0の数値（確信度）,
+  "reason": "判定理由を1文で",
+  "sub": "サブカテゴリ（例: 総合広告代理店, VFXスタジオ, 自動車メーカー 等）"
+}`;
+
+  try {
+    const result = await model.generateContent([{ text: prompt }]);
+    const responseText = result.response.text();
+
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON found in Gemini response');
+    }
+
+    const classification: CompanyClassification = JSON.parse(jsonMatch[0]);
+
+    // Validate type
+    const validTypes = ['agency', 'production', 'cg_production', 'end_client'];
+    if (!validTypes.includes(classification.type)) {
+      classification.type = 'end_client';
+    }
+
+    // Clamp confidence
+    classification.confidence = Math.max(0, Math.min(1, classification.confidence));
+
+    console.log(`✅ Company classified: "${companyName}" → ${classification.type} (${Math.round(classification.confidence * 100)}%): ${classification.reason}`);
+    return classification;
+  } catch (error) {
+    console.error('Company classification error:', error);
+    return {
+      type: 'end_client',
+      confidence: 0,
+      reason: '分類中にエラーが発生しました',
+      sub: '不明',
+    };
+  }
+}
+
