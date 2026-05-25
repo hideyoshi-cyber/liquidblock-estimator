@@ -12,6 +12,7 @@ import {
 import * as XLSX from 'xlsx';
 import { searchCompany, addCustomCompany, removeCustomCompany, getCustomCompanies, companyDatabase, classifyCompanyViaAPI } from './companyDatabase';
 import type { CompanyEntry, AIClassificationResult } from './companyDatabase';
+import { sendEstimateNotification, isEmailConfigured } from './emailService';
 
 // Backend API base URL
 const API_BASE = 'http://localhost:3001';
@@ -1188,25 +1189,32 @@ function App() {
 
     // Check if backend operations actually succeeded
     if (!driveFolderId) {
-      setSubmitError('バックエンドサーバーに接続できませんでした。見積もりはローカルに保存されましたが、Google DriveやEメール送信は行われていません。');
+      setSubmitError('バックエンドサーバーに接続できませんでした。見積もりはローカルに保存されましたが、Google Driveへのアップロードは行われていません。');
     } else {
       setSubmitError('');
     }
-    // Send email notifications to customer and info@liquid-block.com
+    // Send email notifications via EmailJS (no backend required)
     try {
-      await fetch(`${API_BASE}/api/notify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: [customerInfo.email, 'info@liquid-block.com'],
-          subject: `[見積依頼] ${customerInfo.companyName} 様 - ${customerInfo.projectName || '新規案件'}`,
-          projectId,
-          customerInfo,
-          totalAmount: est.total,
-          answers,
-          driveFolderUrl,
-        })
+      const itemSummary = est.items
+        .map(i => `・${i.name}（${i.phase}）: ¥${i.amount.toLocaleString()}`)
+        .join('\n');
+      const emailResult = await sendEstimateNotification({
+        projectId,
+        companyName: customerInfo.companyName,
+        contactName: customerInfo.contactName,
+        email: customerInfo.email,
+        phone: customerInfo.phone,
+        projectName: customerInfo.projectName || '新規案件',
+        totalAmount: est.total,
+        totalAmountWithTax: Math.round(est.total * 1.1),
+        itemSummary,
+        driveFolderUrl,
       });
+      if (emailResult.success) {
+        console.log('✅ Email notifications sent successfully');
+      } else if (emailResult.error) {
+        console.warn('⚠️ Email:', emailResult.error);
+      }
     } catch (e) { console.warn('Email notification skipped:', e); }
 
     setIsSubmitted(true);
