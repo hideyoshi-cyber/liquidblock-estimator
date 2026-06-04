@@ -2510,6 +2510,13 @@ function App() {
               </div>
 
               <div className="glass-panel" style={{ padding: '28px' }}>
+                {/* プロジェクト名 */}
+                <div style={{ marginBottom: '24px' }}>
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <FolderKanban size={16} style={{ color: 'var(--brand-red)' }} /> プロジェクト案件名 <span className="required-badge" style={{ background: 'var(--brand-red)', color: 'white', padding: '2px 6px', borderRadius: '2px', fontSize: '10px' }}>必須</span>
+                  </label>
+                  <input type="text" name="projectName" value={customerInfo.projectName} onChange={e => setCustomerInfo({...customerInfo, projectName: e.target.value})} className="input-field" placeholder="例：〇〇新商品プロモーション映像制作" required />
+                </div>
 
                 {/* 制作期間 */}
                 <div style={{ padding: '16px', background: 'rgba(208, 2, 27, 0.04)', border: '1px solid rgba(208, 2, 27, 0.1)', borderRadius: '2px' }}>
