@@ -220,6 +220,7 @@ export const companyDatabase: CompanyEntry[] = [
   { name: '株式会社プルークス', type: 'production', alias: ['プルークス', 'PROOX'], sub: 'Web動画' },
   { name: '株式会社Crevo', type: 'production', alias: ['Crevo', 'クレボ'], sub: 'Web動画' },
   { name: '株式会社エレファントストーン', type: 'production', alias: ['エレファントストーン'], sub: 'Web動画' },
+  { name: '株式会社フラッグシップオーケストラ', type: 'production', alias: ['フラッグシップオーケストラ', 'FLAGSHIP ORCHESTRA', 'フラッグシップ'], sub: 'Web動画' },
 
   // ================================================
   // CG制作会社・ゲーム会社・アニメスタジオ (cg_production)
